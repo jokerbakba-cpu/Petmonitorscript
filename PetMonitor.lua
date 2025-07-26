@@ -1,9 +1,8 @@
-for _, pet in pairs(workspace.Pets:GetChildren()) do
-    if pet:FindFirstChild("data") then
-        local d = pet.data
-        print("Pet:", pet.Name)
-        print("Peso:", d.weight.Value)
-        print("Idade (Level):", d.level.Value)
-        print("Altura:", d.height.Value)
+for _, obj in pairs(game:GetDescendants()) do
+    if obj:IsA("Model") and obj.Name:lower():find("pet") and obj:FindFirstChild("data") then
+        print("Pet encontrado em:", obj:GetFullName())
+        for _, val in pairs(obj.data:GetChildren()) do
+            print(val.Name, val.Value)
+        end
     end
 end
