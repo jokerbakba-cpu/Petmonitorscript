@@ -1,18 +1,9 @@
-local code = [[
-    function spawnPet()
-        local pet = {}
-        pet.sizeY = math.random(5,15)
-        pet.peso = math.random(10,50)
-        pet.level = math.random(1,10)
-
-        print("Pet Spawned!")
-        print("Altura:", pet.sizeY)
-        print("Peso:", pet.peso)
-        print("Level (idade):", pet.level)
+for _, pet in pairs(workspace.Pets:GetChildren()) do
+    if pet:FindFirstChild("data") then
+        local d = pet.data
+        print("Pet:", pet.Name)
+        print("Peso:", d.weight.Value)
+        print("Idade (Level):", d.level.Value)
+        print("Altura:", d.height.Value)
     end
-
-    spawnPet()
-]]
-
-local func = loadstring(code) -- carrega o código
-func() -- executa
+end
