@@ -1,471 +1,446 @@
--- Santos Hub 🤡 - Sistema de Auto-Descoberta
--- Detecta automaticamente como executar ações no jogo
+-- Santos Hub 🤡 - Grow a Garden Professional Script
+-- Inspirado em loaders profissionais com LinoriaLib
 
+-- Carregar LinoriaLib
+local lib = loadstring(game:HttpGet('https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet('https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet('https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua'))()
+
+-- Serviços
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local MarketplaceService = game:GetService("MarketplaceService")
 
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local lplr = Players.LocalPlayer
+local info = MarketplaceService:GetProductInfo(game.PlaceId)
 
--- Sistema de descoberta automática
-local gameData = {
-    remotes = {},
-    functions = {},
-    objects = {},
-    methods = {}
-}
+-- Verificar se é o jogo correto (Grow a Garden)
+if game.PlaceId ~= 126884695634066 then
+    lib:Notify('Jogo não suportado: ' .. info.Name .. '. Este script é para Grow a Garden!')
+    return
+end
 
 -- Variáveis de controle
-local autoFarm = false
-local autoWater = false
-local autoHarvest = false
-local autoPlant = false
-local autoBuySeeds = false
-local autoBuyGear = false
-local autoFeedPet = false
-local autoEvent = false
-local isScanning = false
+local Toggles = {}
+local Options = {}
 
--- Criar GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "SantosHub"
-gui.Parent = playerGui
+-- Configurações
+local config = {
+    autoFarm = false,
+    autoWater = false,
+    autoHarvest = false,
+    autoPlant = false,
+    autoBuySeeds = false,
+    autoBuyGear = false,
+    autoFeedPet = false,
+    autoEvent = false,
+    selectedSeed = "Carrot",
+    selectedGear = "Watering Can", 
+    selectedFruit = "Apple",
+    farmDelay = 2,
+    shopDelay = 5,
+    petDelay = 3
+}
 
--- Orbe (minimizado)
-local orb = Instance.new("ImageButton")
-orb.Name = "Orb"
-orb.Parent = gui
-orb.Size = UDim2.new(0, 60, 0, 60)
-orb.Position = UDim2.new(0, 50, 0, 50)
-orb.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
-orb.BorderSizePixel = 0
-orb.Visible = false
+-- Criar a janela principal
+local Window = lib:CreateWindow({
+    Title = '🤡 Santos Hub - Grow a Garden',
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    ShowCustomCursor = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
 
-local orbCorner = Instance.new("UICorner")
-orbCorner.CornerRadius = UDim.new(0.5, 0)
-orbCorner.Parent = orb
+-- Abas
+local MainTab = Window:AddTab('🚜 Auto Farm')
+local ShopTab = Window:AddTab('🛒 Auto Shop')
+local PetTab = Window:AddTab('🐾 Pet Farm')
+local EventTab = Window:AddTab('🎉 Events')
+local SettingsTab = Window:AddTab('⚙️ Settings')
 
-local orbText = Instance.new("TextLabel")
-orbText.Parent = orb
-orbText.Size = UDim2.new(1, 0, 1, 0)
-orbText.BackgroundTransparency = 1
-orbText.Text = "🤡"
-orbText.TextScaled = true
-orbText.TextColor3 = Color3.fromRGB(255, 255, 255)
-orbText.Font = Enum.Font.GothamBold
-
--- Frame principal
-local main = Instance.new("Frame")
-main.Name = "MainFrame"
-main.Parent = gui
-main.Size = UDim2.new(0, 450, 0, 600)
-main.Position = UDim2.new(0.5, -225, 0.5, -300)
-main.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-main.BorderSizePixel = 0
-
-local stroke = Instance.new("UIStroke")
-stroke.Parent = main
-stroke.Color = Color3.fromRGB(220, 50, 50)
-stroke.Thickness = 3
-
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 12)
-corner.Parent = main
-
--- Cabeçalho
-local header = Instance.new("Frame")
-header.Parent = main
-header.Size = UDim2.new(1, 0, 0, 50)
-header.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
-header.BorderSizePixel = 0
-
-local headerCorner = Instance.new("UICorner")
-headerCorner.CornerRadius = UDim.new(0, 12)
-headerCorner.Parent = header
-
-local title = Instance.new("TextLabel")
-title.Parent = header
-title.Size = UDim2.new(1, -100, 1, 0)
-title.Position = UDim2.new(0, 15, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "🤡 SANTOS HUB AUTO-DISCOVERY 🤡"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextScaled = true
-title.Font = Enum.Font.GothamBold
-
-local closeBtn = Instance.new("TextButton")
-closeBtn.Parent = header
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -40, 0.5, -15)
-closeBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-closeBtn.Text = "−"
-closeBtn.TextColor3 = Color3.fromRGB(220, 50, 50)
-closeBtn.TextScaled = true
-closeBtn.Font = Enum.Font.GothamBold
-
-local closeBtnCorner = Instance.new("UICorner")
-closeBtnCorner.CornerRadius = UDim.new(0.5, 0)
-closeBtnCorner.Parent = closeBtn
-
--- Container scrollável
-local container = Instance.new("ScrollingFrame")
-container.Parent = main
-container.Size = UDim2.new(1, 0, 1, -50)
-container.Position = UDim2.new(0, 0, 0, 50)
-container.BackgroundTransparency = 1
-container.ScrollBarThickness = 5
-container.ScrollBarImageColor3 = Color3.fromRGB(220, 50, 50)
-container.CanvasSize = UDim2.new(0, 0, 0, 1000)
-
--- Função para criar botão
-local function createButton(text, position, callback)
-    local btn = Instance.new("TextButton")
-    btn.Parent = container
-    btn.Size = UDim2.new(0, 400, 0, 35)
-    btn.Position = position
-    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
-    btn.BorderSizePixel = 0
-    btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextScaled = true
-    btn.Font = Enum.Font.Gotham
-    
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 8)
-    btnCorner.Parent = btn
-    
-    btn.MouseButton1Click:Connect(callback)
-    return btn
-end
-
--- Função para criar texto de info
-local function createInfoText(text, position, color)
-    local label = Instance.new("TextLabel")
-    label.Parent = container
-    label.Size = UDim2.new(0, 400, 0, 25)
-    label.Position = position
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.TextColor3 = color or Color3.fromRGB(200, 200, 200)
-    label.TextSize = 12
-    label.Font = Enum.Font.Gotham
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.TextWrapped = true
-    return label
-end
-
--- Sistema de descoberta automática
-local function scanForRemotes()
-    print("🤡 Iniciando escaneamento de RemoteEvents/RemoteFunctions...")
-    
-    gameData.remotes = {}
-    
-    -- Escanear ReplicatedStorage
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-            local path = obj:GetFullName()
-            gameData.remotes[obj.Name] = {
-                object = obj,
-                path = path,
-                type = obj.ClassName
-            }
-            print("📡 Encontrado: " .. obj.Name .. " (" .. obj.ClassName .. ") em " .. path)
-        end
-    end
-    
-    return #gameData.remotes > 0
-end
-
-local function scanForObjects()
-    print("🤡 Escaneando objetos do jogo...")
-    
-    gameData.objects = {
-        plots = {},
-        shops = {},
-        pets = {},
-        events = {}
-    }
-    
-    -- Escanear por plots
+-- Funções do jogo
+local function findPlots()
+    local plots = {}
     for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj.Name:lower():find("plot") or obj.Name:lower():find("farm") then
-            table.insert(gameData.objects.plots, obj)
-            print("🌱 Plot encontrado: " .. obj.Name)
-        elseif obj.Name:lower():find("shop") or obj.Name:lower():find("store") then
-            table.insert(gameData.objects.shops, obj)
-            print("🛒 Loja encontrada: " .. obj.Name)
-        elseif obj.Name:lower():find("pet") then
-            table.insert(gameData.objects.pets, obj)
-            print("🐾 Pet encontrado: " .. obj.Name)
-        elseif obj.Name:lower():find("event") or obj.Name:lower():find("gift") then
-            table.insert(gameData.objects.events, obj)
-            print("🎉 Evento encontrado: " .. obj.Name)
-        end
-    end
-end
-
-local function analyzePlayerActions()
-    print("🤡 Analisando ações do jogador...")
-    
-    -- Monitorar calls de remotes
-    local oldFireServer = nil
-    local oldInvokeServer = nil
-    
-    -- Hook RemoteEvents
-    for name, remote in pairs(gameData.remotes) do
-        if remote.type == "RemoteEvent" then
-            local originalFire = remote.object.FireServer
-            remote.object.FireServer = function(self, ...)
-                local args = {...}
-                print("🔍 RemoteEvent disparado: " .. name .. " com args: " .. tostring(args))
-                
-                -- Tentar identificar o tipo de ação
-                local argsStr = table.concat(args, ", "):lower()
-                if argsStr:find("water") then
-                    gameData.methods.water = {remote = remote.object, args = args}
-                elseif argsStr:find("harvest") then
-                    gameData.methods.harvest = {remote = remote.object, args = args}
-                elseif argsStr:find("plant") then
-                    gameData.methods.plant = {remote = remote.object, args = args}
-                elseif argsStr:find("buy") or argsStr:find("purchase") then
-                    gameData.methods.buy = {remote = remote.object, args = args}
-                elseif argsStr:find("feed") then
-                    gameData.methods.feed = {remote = remote.object, args = args}
-                end
-                
-                return originalFire(self, ...)
+        if obj.Name:find("Plot") or obj.Name:find("plot") then
+            if obj:FindFirstChild("Soil") or obj:IsA("Model") then
+                table.insert(plots, obj)
             end
         end
     end
+    return plots
 end
 
-local function tryExecuteAction(actionType, target)
-    local method = gameData.methods[actionType]
-    if method then
-        print("🤡 Executando " .. actionType .. " usando método descoberto")
+local function getRemote(name)
+    local remote = ReplicatedStorage:FindFirstChild("Remotes")
+    if remote then
+        return remote:FindFirstChild(name)
+    end
+    return nil
+end
+
+local function waterPlant(plot)
+    local remote = getRemote("PlotAction") or getRemote("Water") or getRemote("WaterPlot")
+    if remote then
         pcall(function()
-            if method.remote then
-                method.remote:FireServer(unpack(method.args))
-            end
+            remote:FireServer(plot, "Water")
         end)
-        return true
-    else
-        print("❌ Método para " .. actionType .. " não foi descoberto ainda")
-        return false
     end
 end
 
--- Interface
-local yPos = 20
-
--- Seção de descoberta
-local discoveryLabel = createInfoText("🔍 SISTEMA DE AUTO-DESCOBERTA", UDim2.new(0, 25, 0, yPos), Color3.fromRGB(220, 50, 50))
-discoveryLabel.Font = Enum.Font.GothamBold
-discoveryLabel.TextSize = 14
-yPos = yPos + 35
-
-local scanBtn = createButton("🔍 ESCANEAR JOGO", UDim2.new(0, 25, 0, yPos), function()
-    scanBtn.Text = "🔄 ESCANEANDO..."
-    scanBtn.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
-    
-    spawn(function()
-        isScanning = true
-        local foundRemotes = scanForRemotes()
-        scanForObjects()
-        analyzePlayerActions()
-        
-        wait(2)
-        
-        scanBtn.Text = foundRemotes and "✅ ESCANEAMENTO COMPLETO" or "❌ POUCOS DADOS ENCONTRADOS"
-        scanBtn.BackgroundColor3 = foundRemotes and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
-        isScanning = false
-        
-        -- Mostrar resultados
-        local remotesFound = 0
-        for _ in pairs(gameData.remotes) do remotesFound = remotesFound + 1 end
-        
-        statusLabel.Text = string.format("🤡 Descobertos: %d remotes, %d plots, %d lojas", 
-            remotesFound, #gameData.objects.plots, #gameData.objects.shops)
-    end)
-end)
-
-yPos = yPos + 50
-
--- Instruções
-local instructionLabel = createInfoText("💡 INSTRUÇÕES: 1) Clique em 'Escanear Jogo' 2) Execute ações manualmente no jogo 3) O hub aprenderá automaticamente", UDim2.new(0, 25, 0, yPos), Color3.fromRGB(255, 215, 0))
-instructionLabel.Size = UDim2.new(0, 400, 0, 40)
-instructionLabel.TextWrapped = true
-yPos = yPos + 50
-
--- Seção Auto Farm
-local farmLabel = createInfoText("🚜 AUTO FARM (Baseado em Descoberta)", UDim2.new(0, 25, 0, yPos), Color3.fromRGB(220, 50, 50))
-farmLabel.Font = Enum.Font.GothamBold
-yPos = yPos + 30
-
-local autoWaterBtn = createButton("🔴 Auto Water: OFF", UDim2.new(0, 25, 0, yPos), function()
-    autoWater = not autoWater
-    autoWaterBtn.Text = (autoWater and "🟢" or "🔴") .. " Auto Water: " .. (autoWater and "ON" or "OFF")
-    autoWaterBtn.BackgroundColor3 = autoWater and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 75)
-end)
-yPos = yPos + 45
-
-local autoHarvestBtn = createButton("🔴 Auto Harvest: OFF", UDim2.new(0, 25, 0, yPos), function()
-    autoHarvest = not autoHarvest
-    autoHarvestBtn.Text = (autoHarvest and "🟢" or "🔴") .. " Auto Harvest: " .. (autoHarvest and "ON" or "OFF")
-    autoHarvestBtn.BackgroundColor3 = autoHarvest and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 75)
-end)
-yPos = yPos + 45
-
-local autoPlantBtn = createButton("🔴 Auto Plant: OFF", UDim2.new(0, 25, 0, yPos), function()
-    autoPlant = not autoPlant
-    autoPlantBtn.Text = (autoPlant and "🟢" or "🔴") .. " Auto Plant: " .. (autoPlant and "ON" or "OFF")
-    autoPlantBtn.BackgroundColor3 = autoPlant and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 75)
-end)
-yPos = yPos + 45
-
-local autoBuySeedsBtn = createButton("🔴 Auto Buy Seeds: OFF", UDim2.new(0, 25, 0, yPos), function()
-    autoBuySeeds = not autoBuySeeds
-    autoBuySeedsBtn.Text = (autoBuySeeds and "🟢" or "🔴") .. " Auto Buy Seeds: " .. (autoBuySeeds and "ON" or "OFF")
-    autoBuySeedsBtn.BackgroundColor3 = autoBuySeeds and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 75)
-end)
-yPos = yPos + 45
-
-local autoFeedPetBtn = createButton("🔴 Auto Feed Pet: OFF", UDim2.new(0, 25, 0, yPos), function()
-    autoFeedPet = not autoFeedPet
-    autoFeedPetBtn.Text = (autoFeedPet and "🟢" or "🔴") .. " Auto Feed Pet: " .. (autoFeedPet and "ON" or "OFF")
-    autoFeedPetBtn.BackgroundColor3 = autoFeedPet and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(60, 60, 75)
-end)
-yPos = yPos + 45
-
-local autoEventBtn = createButton("🔴 Auto Event: OFF", UDim2.new(0, 25, 0, yPos), function()
-    autoEvent = not autoEvent
-    autoEventBtn.Text = (autoEvent and "🟢" or "🔴") .. " Auto Event: " .. (autoEvent and "ON" or "OFF")
-    autoEventBtn.BackgroundColor3 = autoEvent and Color3.fromRGB(255, 165, 0) or Color3.fromRGB(60, 60, 75)
-end)
-yPos = yPos + 60
-
--- Status
-local statusLabel = createInfoText("🤡 Status: Aguardando escaneamento...", UDim2.new(0, 25, 0, yPos), Color3.fromRGB(200, 200, 200))
-yPos = yPos + 30
-
--- Dados descobertos
-local dataLabel = createInfoText("📊 Métodos Descobertos: Nenhum ainda", UDim2.new(0, 25, 0, yPos), Color3.fromRGB(150, 150, 150))
-dataLabel.Size = UDim2.new(0, 400, 0, 40)
-dataLabel.TextWrapped = true
-yPos = yPos + 50
-
--- Créditos
-local credits = createInfoText("🎪 Santos Hub Auto-Discovery | O hub aprende sozinho! 🤡", UDim2.new(0, 25, 0, yPos), Color3.fromRGB(150, 150, 150))
-credits.TextXAlignment = Enum.TextXAlignment.Center
-
--- Funções de minimizar/maximizar
-local function minimize()
-    main.Visible = false
-    orb.Visible = true
-    local tween = TweenService:Create(orb, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.new(0, 70, 0, 70)})
-    tween:Play()
-    wait(0.1)
-    tween = TweenService:Create(orb, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 60, 0, 60)})
-    tween:Play()
+local function harvestPlant(plot)
+    local remote = getRemote("PlotAction") or getRemote("Harvest") or getRemote("HarvestPlot")
+    if remote then
+        pcall(function()
+            remote:FireServer(plot, "Harvest")
+        end)
+    end
 end
 
-local function maximize()
-    orb.Visible = false
-    main.Visible = true
-    main.Size = UDim2.new(0, 100, 0, 100)
-    local tween = TweenService:Create(main, TweenInfo.new(0.4, Enum.EasingStyle.Back), {Size = UDim2.new(0, 450, 0, 600)})
-    tween:Play()
+local function plantSeed(plot, seedType)
+    local remote = getRemote("PlotAction") or getRemote("Plant") or getRemote("PlantSeed")
+    if remote then
+        pcall(function()
+            remote:FireServer(plot, "Plant", seedType or config.selectedSeed)
+        end)
+    end
 end
 
-closeBtn.MouseButton1Click:Connect(minimize)
-orb.MouseButton1Click:Connect(maximize)
+local function buyItem(itemType, itemName)
+    local remote = getRemote("Shop") or getRemote("BuyItem") or getRemote("Purchase")
+    if remote then
+        pcall(function()
+            remote:FireServer(itemType, itemName)
+        end)
+    end
+end
 
--- Tornar arrastável
-orb.Active = true
-orb.Draggable = true
-main.Active = true
-main.Draggable = true
+local function feedPet(fruit)
+    local remote = getRemote("PetAction") or getRemote("FeedPet") or getRemote("Pet")
+    if remote then
+        pcall(function()
+            remote:FireServer("Feed", fruit or config.selectedFruit)
+        end)
+    end
+end
 
--- Rotação da orbe
-spawn(function()
-    while true do
-        if orb.Visible then
-            for i = 0, 360, 2 do
-                if not orb.Visible then break end
-                orb.Rotation = i
-                wait(0.03)
+local function collectEvents()
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj.Name:find("Event") or obj.Name:find("Gift") or obj.Name:find("Chest") or obj.Name:find("Coin") then
+            if obj:FindFirstChild("ClickDetector") then
+                pcall(function()
+                    fireclickdetector(obj.ClickDetector)
+                end)
+            elseif obj:FindFirstChild("ProximityPrompt") then
+                pcall(function()
+                    fireproximityprompt(obj.ProximityPrompt)
+                end)
             end
-        else
-            wait(0.5)
         end
     end
+end
+
+-- ABA MAIN FARM
+local MainGroup = MainTab:AddLeftGroupbox('🚜 Auto Farm Controls')
+
+MainGroup:AddToggle('AutoFarmToggle', {
+    Text = 'Auto Farm Master',
+    Default = false,
+    Tooltip = 'Ativa/desativa todas as funções de farm automaticamente',
+    Callback = function(Value)
+        config.autoFarm = Value
+        lib:Notify(Value and '🟢 Auto Farm Ativado!' or '🔴 Auto Farm Desativado!')
+    end
+})
+
+MainGroup:AddToggle('AutoWaterToggle', {
+    Text = 'Auto Water Plants',
+    Default = false,
+    Tooltip = 'Rega plantas automaticamente',
+    Callback = function(Value)
+        config.autoWater = Value
+    end
+})
+
+MainGroup:AddToggle('AutoHarvestToggle', {
+    Text = 'Auto Harvest Plants',
+    Default = false,
+    Tooltip = 'Colhe plantas automaticamente',
+    Callback = function(Value)
+        config.autoHarvest = Value
+    end
+})
+
+MainGroup:AddToggle('AutoPlantToggle', {
+    Text = 'Auto Plant Seeds',
+    Default = false,
+    Tooltip = 'Planta sementes automaticamente',
+    Callback = function(Value)
+        config.autoPlant = Value
+    end
+})
+
+local SeedGroup = MainTab:AddRightGroupbox('🌱 Seed Selection')
+
+SeedGroup:AddDropdown('SeedDropdown', {
+    Values = {'Carrot', 'Potato', 'Corn', 'Tomato', 'Wheat', 'Lettuce', 'Onion', 'Pumpkin'},
+    Default = 1,
+    Multi = false,
+    Text = 'Select Seed Type',
+    Tooltip = 'Escolha o tipo de semente para plantar',
+    Callback = function(Value)
+        config.selectedSeed = Value
+        lib:Notify('🌱 Semente selecionada: ' .. Value)
+    end
+})
+
+SeedGroup:AddSlider('FarmDelaySlider', {
+    Text = 'Farm Delay (seconds)',
+    Default = 2,
+    Min = 1,
+    Max = 10,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(Value)
+        config.farmDelay = Value
+    end
+})
+
+-- ABA SHOP
+local ShopGroup = ShopTab:AddLeftGroupbox('🛒 Auto Shop')
+
+ShopGroup:AddToggle('AutoBuySeedsToggle', {
+    Text = 'Auto Buy Seeds',
+    Default = false,
+    Tooltip = 'Compra sementes automaticamente',
+    Callback = function(Value)
+        config.autoBuySeeds = Value
+        lib:Notify(Value and '🟢 Auto Buy Seeds Ativado!' or '🔴 Auto Buy Seeds Desativado!')
+    end
+})
+
+ShopGroup:AddToggle('AutoBuyGearToggle', {
+    Text = 'Auto Buy Gear',
+    Default = false,
+    Tooltip = 'Compra equipamentos automaticamente',
+    Callback = function(Value)
+        config.autoBuyGear = Value
+        lib:Notify(Value and '🟢 Auto Buy Gear Ativado!' or '🔴 Auto Buy Gear Desativado!')
+    end
+})
+
+local GearGroup = ShopTab:AddRightGroupbox('🔧 Gear Selection')
+
+GearGroup:AddDropdown('GearDropdown', {
+    Values = {'Watering Can', 'Fertilizer', 'Shovel', 'Hoe', 'Sprinkler', 'Garden Gloves'},
+    Default = 1,
+    Multi = false,
+    Text = 'Select Gear Type',
+    Tooltip = 'Escolha o tipo de equipamento para comprar',
+    Callback = function(Value)
+        config.selectedGear = Value
+        lib:Notify('🔧 Equipamento selecionado: ' .. Value)
+    end
+})
+
+GearGroup:AddSlider('ShopDelaySlider', {
+    Text = 'Shop Delay (seconds)',
+    Default = 5,
+    Min = 1,
+    Max = 30,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(Value)
+        config.shopDelay = Value
+    end
+})
+
+-- ABA PET
+local PetGroup = PetTab:AddLeftGroupbox('🐾 Pet Management')
+
+PetGroup:AddToggle('AutoFeedPetToggle', {
+    Text = 'Auto Feed Pet',
+    Default = false,
+    Tooltip = 'Alimenta pets automaticamente',
+    Callback = function(Value)
+        config.autoFeedPet = Value
+        lib:Notify(Value and '🟢 Auto Feed Pet Ativado!' or '🔴 Auto Feed Pet Desativado!')
+    end
+})
+
+local FruitGroup = PetTab:AddRightGroupbox('🍎 Fruit Selection')
+
+FruitGroup:AddDropdown('FruitDropdown', {
+    Values = {'Apple', 'Orange', 'Banana', 'Strawberry', 'Watermelon', 'Grapes', 'Pineapple'},
+    Default = 1,
+    Multi = false,
+    Text = 'Select Fruit Type',
+    Tooltip = 'Escolha o tipo de fruta para alimentar o pet',
+    Callback = function(Value)
+        config.selectedFruit = Value
+        lib:Notify('🍎 Fruta selecionada: ' .. Value)
+    end
+})
+
+FruitGroup:AddSlider('PetDelaySlider', {
+    Text = 'Pet Feed Delay (seconds)',
+    Default = 3,
+    Min = 1,
+    Max = 15,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(Value)
+        config.petDelay = Value
+    end
+})
+
+-- ABA EVENTS
+local EventGroup = EventTab:AddLeftGroupbox('🎉 Event Farming')
+
+EventGroup:AddToggle('AutoEventToggle', {
+    Text = 'Auto Collect Events',
+    Default = false,
+    Tooltip = 'Coleta eventos, gifts e coins automaticamente',
+    Callback = function(Value)
+        config.autoEvent = Value
+        lib:Notify(Value and '🟢 Auto Event Ativado!' or '🔴 Auto Event Desativado!')
+    end
+})
+
+EventGroup:AddButton('Collect All Events Now', function()
+    collectEvents()
+    lib:Notify('🎉 Coletando todos os eventos disponíveis!')
 end)
 
--- Loop principal de execução
-spawn(function()
+local StatusGroup = EventTab:AddRightGroupbox('📊 Status')
+
+local StatusLabel = StatusGroup:AddLabel('Status: Aguardando...')
+
+-- ABA SETTINGS
+local SettingsGroup = SettingsTab:AddLeftGroupbox('⚙️ Hub Settings')
+
+SettingsGroup:AddButton('Destroy Hub', function()
+    lib:Unload()
+    lib:Notify('🤡 Santos Hub descarregado!')
+end)
+
+SettingsGroup:AddLabel('🤡 Santos Hub v1.0')
+SettingsGroup:AddLabel('🎪 Feito para Grow a Garden')
+SettingsGroup:AddLabel('⚡ Usando LinoriaLib')
+
+-- Configurar temas
+ThemeManager:SetLibrary(lib)
+ThemeManager:SetFolder('SantosHub')
+ThemeManager:ApplyToTab(SettingsTab)
+
+-- Configurar salvamento
+SaveManager:SetLibrary(lib)
+SaveManager:SetFolder('SantosHub/configs')
+SaveManager:SetIgnoreIndexes({'MenuKeybind'})
+SaveManager:ApplyToTab(SettingsTab)
+
+-- Loops principais
+local farmLoop = nil
+local shopLoop = nil  
+local petLoop = nil
+local eventLoop = nil
+
+-- Loop do Auto Farm
+farmLoop = task.spawn(function()
     while true do
-        wait(3)
-        
-        if autoWater and gameData.methods.water then
-            for _, plot in pairs(gameData.objects.plots) do
-                tryExecuteAction("water", plot)
-            end
-        end
-        
-        if autoHarvest and gameData.methods.harvest then
-            for _, plot in pairs(gameData.objects.plots) do
-                tryExecuteAction("harvest", plot)
-            end
-        end
-        
-        if autoPlant and gameData.methods.plant then
-            for _, plot in pairs(gameData.objects.plots) do
-                tryExecuteAction("plant", plot)
-            end
-        end
-        
-        if autoBuySeeds and gameData.methods.buy then
-            tryExecuteAction("buy", "seeds")
-        end
-        
-        if autoFeedPet and gameData.methods.feed then
-            for _, pet in pairs(gameData.objects.pets) do
-                tryExecuteAction("feed", pet)
-            end
-        end
-        
-        if autoEvent then
-            for _, event in pairs(gameData.objects.events) do
-                if event:FindFirstChild("ClickDetector") then
-                    pcall(function()
-                        fireclickdetector(event.ClickDetector)
-                    end)
+        if config.autoFarm then
+            local plots = findPlots()
+            
+            for _, plot in pairs(plots) do
+                if config.autoWater then
+                    waterPlant(plot)
+                    task.wait(0.1)
+                end
+                
+                if config.autoHarvest then
+                    harvestPlant(plot)
+                    task.wait(0.1)
+                end
+                
+                if config.autoPlant then
+                    plantSeed(plot, config.selectedSeed)
+                    task.wait(0.1)
                 end
             end
+            
+            StatusLabel:SetText('Status: Farm ativo - ' .. #plots .. ' plots processados')
+        else
+            StatusLabel:SetText('Status: Farm inativo')
         end
         
-        -- Atualizar dados descobertos
-        local methodsCount = 0
-        local methodsList = {}
-        for method, _ in pairs(gameData.methods) do
-            methodsCount = methodsCount + 1
-            table.insert(methodsList, method)
-        end
-        
-        if methodsCount > 0 then
-            dataLabel.Text = "📊 Métodos Descobertos: " .. table.concat(methodsList, ", ")
-        end
+        task.wait(config.farmDelay)
     end
 end)
 
-print("🤡 SANTOS HUB AUTO-DISCOVERY CARREGADO!")
-print("🔍 Este hub descobre automaticamente como o jogo funciona")
-print("💡 Instruções:")
-print("   1. Clique em 'Escanear Jogo'")
-print("   2. Execute ações manualmente (regar, plantar, etc)")
-print("   3. O hub aprenderá e replicará suas ações")
-print("🎪 Sistema inteligente de descoberta automática!")
+-- Loop da Loja
+shopLoop = task.spawn(function()
+    while true do
+        if config.autoBuySeeds then
+            buyItem("Seeds", config.selectedSeed)
+            task.wait(0.5)
+        end
+        
+        if config.autoBuyGear then
+            buyItem("Gear", config.selectedGear)
+            task.wait(0.5)
+        end
+        
+        task.wait(config.shopDelay)
+    end
+end)
+
+-- Loop do Pet
+petLoop = task.spawn(function()
+    while true do
+        if config.autoFeedPet then
+            feedPet(config.selectedFruit)
+        end
+        
+        task.wait(config.petDelay)
+    end
+end)
+
+-- Loop dos Eventos
+eventLoop = task.spawn(function()
+    while true do
+        if config.autoEvent then
+            collectEvents()
+        end
+        
+        task.wait(2)
+    end
+end)
+
+-- Notificação de carregamento
+lib:Notify('🤡 Santos Hub carregado com sucesso!')
+lib:Notify('🎪 Bem-vindo ao Grow a Garden Hub!')
+
+-- Configuração da tecla de menu
+lib.ToggleKeybind = Options.MenuKeybind
+
+-- Carregar configuração
+task.spawn(function()
+    task.wait(1)
+    SaveManager:LoadAutoloadConfig()
+end)
+
+print("🤡 SANTOS HUB CARREGADO!")
+print("🎪 Versão: Professional com LinoriaLib")
+print("⚡ Funcionalidades:")
+print("   • Auto Farm completo")
+print("   • Auto Shop inteligente") 
+print("   • Auto Pet Feed")
+print("   • Auto Event Collection")
+print("   • Interface profissional")
+print("   • Sistema de salvamento")
+print("🤡 Divirta-se com o melhor hub!")
